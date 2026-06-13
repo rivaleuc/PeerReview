@@ -1,16 +1,46 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PeerReview</title><script src="https://cdn.tailwindcss.com"></script></head>
-<body class="bg-gray-950 text-white min-h-screen p-6"><div class="max-w-2xl mx-auto">
-<h1 class="text-2xl font-bold mb-6">🔬 PeerReview</h1>
-<div class="bg-gray-900 rounded-xl p-6 mb-4 border border-gray-800 space-y-3">
-<h2 class="text-pink-400 font-semibold">Submit Paper</h2>
-<input placeholder="Title" class="w-full bg-gray-950 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-600 outline-none">
-<textarea placeholder="Abstract..." rows="3" class="w-full bg-gray-950 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-600 outline-none resize-none"></textarea>
-<input placeholder="Paper URL" class="w-full bg-gray-950 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-600 outline-none">
-<button class="w-full bg-pink-600 hover:bg-pink-700 rounded-lg py-3 font-bold">Submit</button>
-</div>
-<div class="bg-gray-900 rounded-xl p-6 border border-gray-800 space-y-3">
-<h2 class="text-yellow-400 font-semibold">Trigger Review</h2>
-<input placeholder="Paper key" class="w-full bg-gray-950 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-600 outline-none">
-<button class="w-full bg-yellow-600 hover:bg-yellow-700 rounded-lg py-3 font-bold">📝 Review Now</button>
-</div>
-</div></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>PeerReview</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-[#fafafa] text-gray-900 min-h-screen">
+  <nav class="bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center shadow-sm">
+    <div class="flex items-center gap-2"><span class="text-2xl">🔬</span><h1 class="text-xl font-bold">PeerReview</h1></div>
+    <span class="text-xs text-gray-500">Decentralized Academic Review</span>
+  </nav>
+  <main class="max-w-3xl mx-auto p-6 space-y-6">
+    <!-- Submit Paper -->
+    <section class="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
+      <h2 class="text-indigo-600 font-semibold mb-4">Submit Paper</h2>
+      <input placeholder="Paper title" class="w-full border border-gray-300 rounded-xl px-4 py-3 mb-3 placeholder-gray-400 outline-none focus:border-indigo-500">
+      <textarea placeholder="Abstract..." rows="3" class="w-full border border-gray-300 rounded-xl px-4 py-3 mb-3 placeholder-gray-400 outline-none resize-none focus:border-indigo-500"></textarea>
+      <input placeholder="Paper URL (PDF or web)" class="w-full border border-gray-300 rounded-xl px-4 py-3 mb-3 placeholder-gray-400 outline-none focus:border-indigo-500">
+      <button class="w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl py-3 font-bold transition">Submit for Review</button>
+    </section>
+
+    <!-- Paper with scores -->
+    <section class="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
+      <div class="flex justify-between items-start mb-4">
+        <div>
+          <h3 class="font-semibold">"Decentralized AI Consensus"</h3>
+          <p class="text-sm text-gray-500 mt-1">Novel approach to agreement among diverse LLMs</p>
+        </div>
+        <span class="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs rounded-full">Pending Review</span>
+      </div>
+      <div class="flex gap-3">
+        <input placeholder="Paper key" class="flex-1 border border-gray-300 rounded-xl px-4 py-2.5 placeholder-gray-400 outline-none text-sm">
+        <button class="bg-pink-600 hover:bg-pink-700 text-white rounded-xl px-5 py-2.5 font-bold text-sm transition">📝 Trigger Review</button>
+      </div>
+      <!-- Score display (empty until reviewed) -->
+      <div class="grid grid-cols-4 gap-2 mt-4">
+        <div class="bg-gray-50 rounded-lg p-3 text-center border"><p class="text-[10px] text-gray-500 uppercase">Novelty</p><p class="text-lg font-bold text-gray-300">—</p></div>
+        <div class="bg-gray-50 rounded-lg p-3 text-center border"><p class="text-[10px] text-gray-500 uppercase">Method</p><p class="text-lg font-bold text-gray-300">—</p></div>
+        <div class="bg-gray-50 rounded-lg p-3 text-center border"><p class="text-[10px] text-gray-500 uppercase">Clarity</p><p class="text-lg font-bold text-gray-300">—</p></div>
+        <div class="bg-gray-50 rounded-lg p-3 text-center border"><p class="text-[10px] text-gray-500 uppercase">Reprod.</p><p class="text-lg font-bold text-gray-300">—</p></div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
