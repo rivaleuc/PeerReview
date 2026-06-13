@@ -1,321 +1,327 @@
-import { useState, type FormEvent } from 'react'
-import { motion } from 'framer-motion'
+import { useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Toaster, toast } from 'sonner'
 
 const CONTRACT = '0x448747bD5D7c9951dAb0FD9D7DB73F45C01Bc9B6'
 
-type Dimension = 'novelty' | 'methodology' | 'clarity' | 'reproducibility'
-const DIMENSIONS: Dimension[] = ['novelty', 'methodology', 'clarity', 'reproducibility']
+const CRIMSON = '#9B1B30'
 
-interface Paper {
+type Scores = { novelty: number; methodology: number; clarity: number; reproducibility: number }
+
+type Paper = {
   id: string
   title: string
   authors: string
   abstract: string
-  reviewed: boolean
-  reviewing?: boolean
-  scores?: Record<Dimension, number>
+  field: string
+  status: 'reviewed' | 'in-review'
+  scores: Scores
+  reasoning: string
 }
 
-const SEED_PAPERS: Paper[] = [
+const PAPERS: Paper[] = [
   {
-    id: 'PR-2024-031',
-    title: 'Consensus Under Subjectivity: Optimistic Validation of LLM Verdicts',
-    authors: 'A. Reyes, K. Tan, M. Osei',
-    abstract: 'We formalise a protocol in which a validator set reaches agreement on the output of non-deterministic language-model judgements.',
-    reviewed: true,
-    scores: { novelty: 9, methodology: 8, clarity: 7, reproducibility: 8 },
+    id: 'arx-2418',
+    title: 'Verifiable Latent Diffusion under Zero-Knowledge Constraints',
+    authors: 'R. Okafor, M. Lindqvist, S. Banerjee',
+    field: 'Machine Learning · Cryptography',
+    status: 'reviewed',
+    abstract:
+      'We present a framework for proving the provenance of diffusion-model outputs without revealing model weights, combining succinct non-interactive arguments with a novel noise-schedule commitment scheme. Empirically, verification cost scales sub-linearly with sampling steps.',
+    scores: { novelty: 88, methodology: 76, clarity: 82, reproducibility: 64 },
+    reasoning:
+      'The commitment scheme is genuinely original and the sub-linear verification claim is well-supported by Section 5. Methodology is sound though the ablation over noise schedules is thin. Reproducibility suffers from an unreleased training corpus; the authors should publish seeds and the schedule generator.',
   },
   {
-    id: 'PR-2024-030',
-    title: 'On the Reproducibility of Prompt-Conditioned Benchmarks',
-    authors: 'L. Becker, S. Nakamura',
-    abstract: 'A systematic study of variance in benchmark scores under fixed prompts and shifting decoding parameters across nine open models.',
-    reviewed: true,
-    scores: { novelty: 6, methodology: 9, clarity: 8, reproducibility: 9 },
+    id: 'arx-2391',
+    title: 'On the Convergence of Federated Agents in Adversarial Markets',
+    authors: 'J. Park, A. Moreau',
+    field: 'Multi-Agent Systems',
+    status: 'reviewed',
+    abstract:
+      'A game-theoretic analysis of federated learning agents competing in a shared market, deriving convergence bounds under bounded adversarial perturbation and proposing an incentive-compatible aggregation rule.',
+    scores: { novelty: 71, methodology: 90, clarity: 68, reproducibility: 85 },
+    reasoning:
+      'Mathematically rigorous with tight bounds and a clean incentive-compatibility proof. The exposition in Sections 3–4 is dense and would benefit from a worked example. Code and simulation harness are fully released, an exemplary reproducibility standard.',
   },
   {
-    id: 'PR-2024-029',
-    title: 'Decentralised Authorship Attestation via Zero-Knowledge Citations',
-    authors: 'P. Andersson',
-    abstract: 'We propose a scheme allowing authors to prove citation integrity without revealing the underlying reference graph.',
-    reviewed: true,
-    scores: { novelty: 8, methodology: 6, clarity: 7, reproducibility: 5 },
+    id: 'arx-2377',
+    title: 'Sparse Mixture Routing for Low-Latency On-Chain Inference',
+    authors: 'L. Castellano, D. Wu, P. Adeyemi, K. Sørensen',
+    field: 'Systems · ML Efficiency',
+    status: 'reviewed',
+    abstract:
+      'We route transformer experts conditioned on gas budgets, achieving 3.2× latency reduction for on-chain inference while preserving accuracy within 1.1% of the dense baseline.',
+    scores: { novelty: 64, methodology: 79, clarity: 91, reproducibility: 72 },
+    reasoning:
+      'Exceptionally clear writing and figures. The gas-conditioned routing is incremental relative to prior MoE work but the on-chain framing is practical and timely. Baselines are fair; would like to see variance across more than three seeds.',
+  },
+  {
+    id: 'arx-2402',
+    title: 'Causal Attribution in Decentralised Oracle Networks',
+    authors: 'F. Nakamura, E. Rossi',
+    field: 'Distributed Systems',
+    status: 'in-review',
+    abstract:
+      'A method for attributing price-feed deviations to individual oracle nodes using causal graphs reconstructed from on-chain attestations.',
+    scores: { novelty: 0, methodology: 0, clarity: 0, reproducibility: 0 },
+    reasoning: 'Assigned to 3 validators. Reviews close in 18 hours.',
   },
 ]
 
-const STEPS = [
-  { n: '1', title: 'Submit the manuscript', body: 'Authors post a title, abstract, and link. The submission is recorded immutably with a review identifier.' },
-  { n: '2', title: 'Independent assessment', body: 'GenLayer validators each read the paper and score it across four established dimensions of scholarship.' },
-  { n: '3', title: 'Consensus scoring', body: 'Individual assessments are reconciled into a single, tamper-proof score with written reasoning attached.' },
-  { n: '4', title: 'Open record', body: 'Scores and reviews are published on-chain — transparent, citable, and free from editorial gatekeeping.' },
+const DIMS: { key: keyof Scores; label: string }[] = [
+  { key: 'novelty', label: 'Novelty' },
+  { key: 'methodology', label: 'Methodology' },
+  { key: 'clarity', label: 'Clarity' },
+  { key: 'reproducibility', label: 'Reproducibility' },
 ]
 
-const FEATURES = [
-  { icon: '◆', title: 'Four-dimension rubric', body: 'Every paper is scored on novelty, methodology, clarity, and reproducibility — the pillars of credible work.' },
-  { icon: '⚖', title: 'Impartial validators', body: 'No editor, no cartel. A decentralised validator set assesses each manuscript independently.' },
-  { icon: '🔗', title: 'Immutable record', body: 'Submissions and verdicts are written on-chain and cannot be silently retracted or revised.' },
-  { icon: '✎', title: 'Reasoned reviews', body: 'Each score arrives with written justification, so authors understand the assessment, not just the number.' },
-  { icon: '🌍', title: 'Open access', body: 'Reviews are public goods. Anyone may read, cite, or build upon the recorded assessments.' },
-  { icon: '⏱', title: 'Days, not months', body: 'Consensus review collapses the traditional cycle from half a year to a matter of days.' },
-]
-
-const fadeUp = {
-  hidden: { opacity: 0, y: 28 },
-  show: { opacity: 1, y: 0 },
-}
-
-function avg(scores: Record<Dimension, number>) {
-  return (DIMENSIONS.reduce((a, d) => a + scores[d], 0) / DIMENSIONS.length).toFixed(1)
-}
-
-export default function App() {
-  const [papers, setPapers] = useState<Paper[]>(SEED_PAPERS)
-  const [title, setTitle] = useState('')
-  const [authors, setAuthors] = useState('')
-  const [abstract, setAbstract] = useState('')
-  const [reviewing, setReviewing] = useState(false)
-
-  function handleSubmit(e: FormEvent) {
-    e.preventDefault()
-    if (!title.trim() || !abstract.trim()) {
-      toast.error('Title and abstract are required.')
-      return
-    }
-    const id = `PR-2024-${String(32 + papers.length).padStart(3, '0')}`
-    const fresh: Paper = {
-      id,
-      title: title.trim(),
-      authors: authors.trim() || 'Anonymous',
-      abstract: abstract.trim(),
-      reviewed: false,
-      reviewing: true,
-    }
-    setPapers((p) => [fresh, ...p])
-    setReviewing(true)
-    toast(`${id} submitted — validators reviewing…`, { icon: '📄' })
-
-    setTimeout(() => {
-      const base = (title.length + abstract.length) % 5
-      const scores: Record<Dimension, number> = {
-        novelty: 6 + ((base + 2) % 4),
-        methodology: 6 + ((base + 1) % 4),
-        clarity: 6 + ((base + 3) % 4),
-        reproducibility: 5 + (base % 5),
-      }
-      setPapers((p) =>
-        p.map((paper) =>
-          paper.id === id ? { ...paper, reviewing: false, reviewed: true, scores } : paper,
-        ),
-      )
-      setReviewing(false)
-      toast.success(`${id} reviewed — composite score ${avg(scores)}/10.`)
-      setTitle('')
-      setAuthors('')
-      setAbstract('')
-    }, 3000)
-  }
-
+function ScoreBar({ label, value }: { label: string; value: number }) {
   return (
-    <div className="min-h-screen text-[#1a1a1a] bg-white overflow-x-hidden">
-      <Toaster theme="light" position="top-right" toastOptions={{ style: { background: '#ffffff', border: '1px solid #9b1b3033', color: '#1a1a1a', fontFamily: 'Source Serif 4, serif' } }} />
-
-      {/* NAV */}
-      <header className="sticky top-0 z-50 backdrop-blur-md bg-white/90 border-b border-[#e7e2d9]">
-        <nav className="max-w-6xl mx-auto px-6 h-[72px] flex items-center justify-between">
-          <a href="#top" className="flex items-center gap-3">
-            <span className="grid place-items-center w-10 h-10 rounded-sm bg-[#9b1b30] text-white font-display font-bold text-lg">P</span>
-            <span className="font-display text-2xl font-semibold tracking-tight">The Ledger<span className="text-[#9b1b30]"> Review</span></span>
-          </a>
-          <div className="hidden md:flex items-center gap-9 text-[15px] text-[#5a5550]">
-            <a href="#how" className="hover:text-[#9b1b30] transition">Process</a>
-            <a href="#features" className="hover:text-[#9b1b30] transition">Standards</a>
-            <a href="#archive" className="hover:text-[#9b1b30] transition">Archive</a>
-          </div>
-          <a href="#submit" className="text-[15px] px-5 py-2 rounded-sm bg-[#9b1b30] text-white hover:bg-[#7d1526] transition">
-            Submit a paper
-          </a>
-        </nav>
-      </header>
-
-      {/* HERO */}
-      <section id="top" className="border-b border-[#e7e2d9]">
-        <div className="max-w-6xl mx-auto px-6 pt-24 pb-24 text-center">
-          <motion.p
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.7 }}
-            className="text-[#9b1b30] tracking-[0.25em] text-xs uppercase mb-6">
-            Decentralised Academic Peer Review · Vol. I
-          </motion.p>
-          <motion.h1
-            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}
-            className="font-display text-5xl md:text-7xl font-semibold leading-[1.06] max-w-4xl mx-auto">
-            Peer review,
-            <span className="block italic text-[#9b1b30]">without the gatekeepers.</span>
-          </motion.h1>
-          <motion.p
-            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.15 }}
-            className="mt-8 text-xl text-[#5a5550] max-w-2xl mx-auto leading-relaxed">
-            Submit a manuscript and a decentralised validator set scores it on novelty, methodology,
-            clarity, and reproducibility — transparently, on-chain, in days rather than months.
-          </motion.p>
-          <motion.div
-            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.3 }}
-            className="mt-11 flex flex-wrap items-center justify-center gap-4">
-            <a href="#submit" className="px-7 py-3.5 rounded-sm bg-[#9b1b30] text-white font-medium hover:bg-[#7d1526] transition">
-              Submit a paper
-            </a>
-            <a href="#archive" className="px-7 py-3.5 rounded-sm border border-[#d8d2c7] text-[#1a1a1a] hover:border-[#9b1b30] transition">
-              Read the archive
-            </a>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* HOW IT WORKS */}
-      <section id="how" className="max-w-6xl mx-auto px-6 py-24">
-        <SectionHead kicker="The Process" title="From submission to settled score" />
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 mt-14">
-          {STEPS.map((s, i) => (
-            <motion.div
-              key={s.n}
-              variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}
-              transition={{ duration: 0.55, delay: i * 0.1 }}
-              className="border-t-2 border-[#9b1b30] pt-5">
-              <span className="font-display text-3xl font-bold text-[#9b1b30]">{s.n}</span>
-              <h3 className="font-display text-xl font-semibold mt-2 mb-2">{s.title}</h3>
-              <p className="text-[15px] text-[#5a5550] leading-relaxed">{s.body}</p>
-            </motion.div>
-          ))}
-        </div>
-      </section>
-
-      {/* FEATURES */}
-      <section id="features" className="border-y border-[#e7e2d9] bg-[#faf8f4]">
-        <div className="max-w-6xl mx-auto px-6 py-24">
-          <SectionHead kicker="Editorial Standards" title="A rigorous, open rubric" />
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-14">
-            {FEATURES.map((f, i) => (
-              <motion.div
-                key={f.title}
-                variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}
-                transition={{ duration: 0.55, delay: i * 0.07 }}
-                className="rounded-sm border border-[#e7e2d9] bg-white p-7 hover:border-[#9b1b30]/40 transition">
-                <div className="text-2xl text-[#9b1b30] mb-4">{f.icon}</div>
-                <h3 className="font-display text-xl font-semibold mb-2.5">{f.title}</h3>
-                <p className="text-[15px] text-[#5a5550] leading-relaxed">{f.body}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* SUBMIT + ARCHIVE */}
-      <section id="submit" className="max-w-6xl mx-auto px-6 py-24">
-        <SectionHead kicker="The Archive" title="Submit a manuscript for review" />
-        <div className="grid lg:grid-cols-[400px_1fr] gap-10 mt-14">
-          {/* form */}
-          <motion.form
-            onSubmit={handleSubmit}
-            variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }} transition={{ duration: 0.55 }}
-            className="rounded-sm border border-[#e7e2d9] bg-[#faf8f4] p-7 h-fit">
-            <h3 className="font-display text-2xl font-semibold text-[#9b1b30] mb-1">Submit for review</h3>
-            <p className="text-sm text-[#5a5550] mb-6">Validators return a four-dimension score in ~3 seconds.</p>
-
-            <label className="block text-sm text-[#5a5550] mb-1.5">Title</label>
-            <input
-              value={title} onChange={(e) => setTitle(e.target.value)}
-              placeholder="Manuscript title"
-              className="w-full bg-white border border-[#d8d2c7] rounded-sm px-3.5 py-2.5 mb-4 text-[15px] placeholder-[#b3ada3] outline-none focus:border-[#9b1b30]" />
-
-            <label className="block text-sm text-[#5a5550] mb-1.5">Authors</label>
-            <input
-              value={authors} onChange={(e) => setAuthors(e.target.value)}
-              placeholder="e.g. A. Reyes, K. Tan"
-              className="w-full bg-white border border-[#d8d2c7] rounded-sm px-3.5 py-2.5 mb-4 text-[15px] placeholder-[#b3ada3] outline-none focus:border-[#9b1b30]" />
-
-            <label className="block text-sm text-[#5a5550] mb-1.5">Abstract</label>
-            <textarea
-              value={abstract} onChange={(e) => setAbstract(e.target.value)} rows={4}
-              placeholder="Summarise the contribution…"
-              className="w-full bg-white border border-[#d8d2c7] rounded-sm px-3.5 py-2.5 mb-6 text-[15px] placeholder-[#b3ada3] outline-none focus:border-[#9b1b30] resize-none" />
-
-            <button
-              type="submit" disabled={reviewing}
-              className="w-full rounded-sm py-3 bg-[#9b1b30] text-white font-medium hover:bg-[#7d1526] transition disabled:opacity-50 disabled:cursor-not-allowed">
-              {reviewing ? 'Validators reviewing…' : 'Submit for review'}
-            </button>
-          </motion.form>
-
-          {/* paper cards */}
-          <motion.div
-            id="archive"
-            variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }} transition={{ duration: 0.55, delay: 0.1 }}
-            className="grid sm:grid-cols-2 gap-5">
-            {papers.map((paper) => (
-              <motion.article
-                key={paper.id} layout
-                initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-                className="rounded-sm border border-[#e7e2d9] bg-white p-6 flex flex-col">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs tracking-wide text-[#9b1b30] font-medium">{paper.id}</span>
-                  {paper.reviewing ? (
-                    <span className="text-xs text-[#9b1b30] animate-pulse">reviewing…</span>
-                  ) : paper.scores ? (
-                    <span className="text-xs px-2 py-0.5 rounded-sm bg-[#9b1b30] text-white">{avg(paper.scores)} / 10</span>
-                  ) : null}
-                </div>
-                <h3 className="font-display text-lg font-semibold leading-snug mb-1">{paper.title}</h3>
-                <p className="text-xs italic text-[#8a847b] mb-3">{paper.authors}</p>
-                <p className="text-[13px] text-[#5a5550] leading-relaxed mb-4 line-clamp-3">{paper.abstract}</p>
-
-                <div className="mt-auto space-y-2">
-                  {DIMENSIONS.map((d) => (
-                    <div key={d}>
-                      <div className="flex justify-between text-[11px] text-[#5a5550] mb-1 capitalize">
-                        <span>{d}</span>
-                        <span className="tabular-nums">{paper.scores ? paper.scores[d] : '—'}</span>
-                      </div>
-                      <div className="h-1.5 rounded-full bg-[#efeae1] overflow-hidden">
-                        <motion.div
-                          className="h-full rounded-full bg-[#9b1b30]"
-                          initial={{ width: 0 }}
-                          animate={{ width: paper.scores ? `${paper.scores[d] * 10}%` : '0%' }}
-                          transition={{ duration: 0.7, ease: 'easeOut' }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </motion.article>
-            ))}
-          </motion.div>
-        </div>
-      </section>
-
-      {/* FOOTER */}
-      <footer className="border-t border-[#e7e2d9] bg-[#faf8f4]">
-        <div className="max-w-6xl mx-auto px-6 py-12 flex flex-col md:flex-row items-center justify-between gap-5">
-          <div className="flex items-center gap-3">
-            <span className="grid place-items-center w-9 h-9 rounded-sm bg-[#9b1b30] text-white font-display font-bold">P</span>
-            <span className="font-display text-xl font-semibold">The Ledger<span className="text-[#9b1b30]"> Review</span></span>
-          </div>
-          <p className="text-xs text-[#8a847b] text-center break-all">
-            Contract <span className="text-[#9b1b30]">{CONTRACT}</span> · GenLayer Bradbury
-          </p>
-          <p className="text-xs text-[#8a847b]">© {new Date().getFullYear()} PeerReview</p>
-        </div>
-      </footer>
+    <div>
+      <div className="flex items-baseline justify-between">
+        <span className="font-display text-sm font-medium text-stone-700">{label}</span>
+        <span className="font-display text-sm font-semibold tabular-nums" style={{ color: CRIMSON }}>{value || '—'}</span>
+      </div>
+      <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-stone-200/70">
+        <motion.div
+          className="h-full rounded-full"
+          style={{ background: CRIMSON }}
+          initial={{ width: 0 }}
+          animate={{ width: `${value}%` }}
+          transition={{ duration: 0.8, ease: 'easeOut' }}
+        />
+      </div>
     </div>
   )
 }
 
-function SectionHead({ kicker, title }: { kicker: string; title: string }) {
+function App() {
+  const [papers, setPapers] = useState(PAPERS)
+  const [selectedId, setSelectedId] = useState(PAPERS[0].id)
+  const [modal, setModal] = useState(false)
+  const [form, setForm] = useState({ title: '', authors: '', field: '', abstract: '' })
+
+  const selected = papers.find((p) => p.id === selectedId)!
+
+  function submit() {
+    if (!form.title.trim() || !form.authors.trim()) {
+      toast.error('Title and authors are required')
+      return
+    }
+    const id = 'arx-' + Math.floor(2400 + Math.random() * 99)
+    const paper: Paper = {
+      id,
+      title: form.title.trim(),
+      authors: form.authors.trim(),
+      field: form.field.trim() || 'Unclassified',
+      status: 'in-review',
+      abstract: form.abstract.trim() || 'No abstract provided.',
+      scores: { novelty: 0, methodology: 0, clarity: 0, reproducibility: 0 },
+      reasoning: 'Submitted to validator pool. Awaiting assignment.',
+    }
+    setPapers((p) => [paper, ...p])
+    setSelectedId(id)
+    setModal(false)
+    setForm({ title: '', authors: '', field: '', abstract: '' })
+    toast.success('Manuscript submitted', { description: `${id} entered the review queue` })
+  }
+
+  const avg = (s: Scores) => Math.round((s.novelty + s.methodology + s.clarity + s.reproducibility) / 4)
+
   return (
-    <motion.div
-      variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }} transition={{ duration: 0.55 }}
-      className="text-center">
-      <p className="text-[#9b1b30] tracking-[0.25em] text-xs uppercase mb-3">{kicker}</p>
-      <h2 className="font-display text-4xl md:text-5xl font-semibold">{title}</h2>
-    </motion.div>
+    <div className="min-h-screen bg-white" style={{ color: '#1a1a1a' }}>
+      <Toaster position="top-center" />
+
+      {/* MASTHEAD */}
+      <header className="border-b-2" style={{ borderColor: CRIMSON }}>
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-4 px-6 py-5">
+          <div>
+            <h1 className="font-display text-2xl font-bold tracking-tight" style={{ color: CRIMSON }}>PeerReview</h1>
+            <p className="mt-0.5 text-[11px] uppercase tracking-[0.25em] text-stone-400">Decentralised Journal of Record</p>
+          </div>
+          <div className="ml-auto flex items-center gap-4">
+            <span className="hidden font-mono text-[11px] text-stone-400 sm:inline">vol. III · {papers.length} manuscripts</span>
+            <button
+              onClick={() => setModal(true)}
+              className="rounded-sm px-4 py-2 font-display text-sm font-semibold text-white transition hover:brightness-110"
+              style={{ background: CRIMSON }}
+            >
+              Submit paper
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* TWO-COLUMN READER */}
+      <div className="mx-auto grid max-w-6xl grid-cols-1 gap-0 px-6 lg:grid-cols-[300px_1fr]">
+        {/* TABLE OF CONTENTS */}
+        <aside className="border-stone-200 py-6 lg:border-r lg:pr-6">
+          <p className="mb-3 font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-stone-400">Contents</p>
+          <ol className="space-y-1">
+            {papers.map((p, i) => {
+              const on = p.id === selectedId
+              return (
+                <li key={p.id}>
+                  <button
+                    onClick={() => setSelectedId(p.id)}
+                    className={`group w-full border-l-2 py-2.5 pl-3 pr-2 text-left transition ${on ? 'bg-stone-50' : 'border-transparent hover:bg-stone-50'}`}
+                    style={on ? { borderColor: CRIMSON } : undefined}
+                  >
+                    <div className="flex items-baseline gap-2">
+                      <span className="font-mono text-[11px] text-stone-400">{String(i + 1).padStart(2, '0')}</span>
+                      <span className={`font-display text-[15px] leading-snug ${on ? 'font-semibold' : 'font-normal text-stone-700'}`} style={on ? { color: CRIMSON } : undefined}>
+                        {p.title}
+                      </span>
+                    </div>
+                    <div className="mt-1 flex items-center gap-2 pl-6">
+                      <span className="text-[11px] text-stone-400">{p.authors.split(',')[0]} et al.</span>
+                      {p.status === 'in-review' ? (
+                        <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-700">in review</span>
+                      ) : (
+                        <span className="font-mono text-[11px] font-semibold" style={{ color: CRIMSON }}>{avg(p.scores)}</span>
+                      )}
+                    </div>
+                  </button>
+                </li>
+              )
+            })}
+          </ol>
+        </aside>
+
+        {/* PAPER DETAIL */}
+        <main className="py-8 lg:pl-10">
+          <AnimatePresence mode="wait">
+            <motion.article
+              key={selected.id}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.35 }}
+            >
+              <div className="flex items-center gap-3 font-mono text-[11px] uppercase tracking-wider text-stone-400">
+                <span>{selected.id}</span>
+                <span className="h-1 w-1 rounded-full bg-stone-300" />
+                <span>{selected.field}</span>
+              </div>
+              <h2 className="mt-3 font-display text-3xl font-bold leading-tight tracking-tight text-stone-900">{selected.title}</h2>
+              <p className="mt-2 font-display text-base italic text-stone-500">{selected.authors}</p>
+
+              <div className="my-6 h-px w-full bg-stone-200" />
+
+              <p className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-stone-400">Abstract</p>
+              <p className="mt-2 text-[17px] leading-relaxed text-stone-700" style={{ fontFamily: "'Source Serif 4', Georgia, serif" }}>
+                {selected.abstract}
+              </p>
+
+              {/* SCORE PANEL */}
+              <div className="mt-8 rounded-md border border-stone-200 bg-stone-50/60 p-6">
+                <div className="flex items-center justify-between">
+                  <p className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-stone-400">Validator Assessment</p>
+                  {selected.status === 'reviewed' ? (
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="font-display text-3xl font-bold" style={{ color: CRIMSON }}>{avg(selected.scores)}</span>
+                      <span className="text-xs text-stone-400">/ 100 composite</span>
+                    </div>
+                  ) : (
+                    <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-700">awaiting reviews</span>
+                  )}
+                </div>
+
+                <div className="mt-5 grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
+                  {DIMS.map((d) => (
+                    <ScoreBar key={d.key} label={d.label} value={selected.scores[d.key]} />
+                  ))}
+                </div>
+
+                <div className="mt-6 border-t border-stone-200 pt-4">
+                  <p className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-stone-400">Reviewer reasoning</p>
+                  <p className="mt-2 text-[15px] leading-relaxed text-stone-600" style={{ fontFamily: "'Source Serif 4', Georgia, serif" }}>
+                    {selected.reasoning}
+                  </p>
+                </div>
+
+                <div className="mt-5 flex flex-wrap items-center gap-3">
+                  <button
+                    onClick={() => toast.success('Citation copied', { description: `${selected.authors} — ${selected.id}` })}
+                    className="rounded-sm border px-3.5 py-2 font-display text-sm font-medium transition hover:bg-white"
+                    style={{ borderColor: CRIMSON, color: CRIMSON }}
+                  >
+                    Cite
+                  </button>
+                  <button
+                    onClick={() => toast('Attestation recorded on-chain', { description: 'Your endorsement is now public' })}
+                    className="rounded-sm px-3.5 py-2 font-display text-sm font-medium text-white transition hover:brightness-110"
+                    style={{ background: CRIMSON }}
+                  >
+                    Endorse
+                  </button>
+                  <span className="ml-auto font-mono text-[10px] text-stone-300">attested via {CONTRACT.slice(0, 10)}…</span>
+                </div>
+              </div>
+            </motion.article>
+          </AnimatePresence>
+        </main>
+      </div>
+
+      {/* SUBMIT MODAL */}
+      <AnimatePresence>
+        {modal && (
+          <div className="fixed inset-0 z-30 grid place-items-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setModal(false)}
+              className="absolute inset-0 bg-stone-900/40 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96, y: 16 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+              className="relative z-10 w-full max-w-lg rounded-md border border-stone-200 bg-white p-7 shadow-2xl"
+            >
+              <div className="flex items-center justify-between border-b-2 pb-3" style={{ borderColor: CRIMSON }}>
+                <h3 className="font-display text-xl font-bold" style={{ color: CRIMSON }}>Submit Manuscript</h3>
+                <button onClick={() => setModal(false)} className="text-stone-400 hover:text-stone-700">✕</button>
+              </div>
+
+              <div className="mt-5 space-y-4">
+                {([
+                  ['title', 'Title', 'The full title of your work'],
+                  ['authors', 'Authors', 'Comma-separated, e.g. A. Smith, B. Jones'],
+                  ['field', 'Field', 'e.g. Machine Learning · Systems'],
+                ] as const).map(([key, label, ph]) => (
+                  <div key={key}>
+                    <label className="font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-400">{label}</label>
+                    <input
+                      value={form[key]}
+                      onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+                      placeholder={ph}
+                      className="mt-1 w-full rounded-sm border border-stone-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-[#9B1B30]"
+                    />
+                  </div>
+                ))}
+                <div>
+                  <label className="font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-400">Abstract</label>
+                  <textarea
+                    value={form.abstract}
+                    onChange={(e) => setForm((f) => ({ ...f, abstract: e.target.value }))}
+                    placeholder="A concise summary of contributions…"
+                    className="mt-1 h-24 w-full resize-none rounded-sm border border-stone-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-[#9B1B30]"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-6 flex items-center justify-end gap-3">
+                <button onClick={() => setModal(false)} className="rounded-sm px-4 py-2 font-display text-sm font-medium text-stone-500 hover:text-stone-800">Cancel</button>
+                <button onClick={submit} className="rounded-sm px-5 py-2 font-display text-sm font-semibold text-white transition hover:brightness-110" style={{ background: CRIMSON }}>
+                  Submit for review
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </div>
   )
 }
+
+export default App
