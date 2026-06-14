@@ -10,10 +10,6 @@ Peer review requires reading a paper, understanding its methodology, assessing n
 
 **GenLayer (Bradbury):** `0x448747bD5D7c9951dAb0FD9D7DB73F45C01Bc9B6`
 
-## Test
-
-Submitted: "Decentralized AI Consensus" → paper stored, waiting for review trigger.
-
 ## Structure
 
 ```
