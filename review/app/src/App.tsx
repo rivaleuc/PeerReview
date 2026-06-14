@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Toaster, toast } from 'sonner'
+import { connectWallet, isWalletConnected } from './genlayer'
 
 const CONTRACT = '0x448747bD5D7c9951dAb0FD9D7DB73F45C01Bc9B6'
 
@@ -101,6 +102,17 @@ function App() {
   const [selectedId, setSelectedId] = useState(PAPERS[0].id)
   const [modal, setModal] = useState(false)
   const [form, setForm] = useState({ title: '', authors: '', field: '', abstract: '' })
+  const [wallet, setWallet] = useState<string | null>(null)
+
+  async function handleConnect() {
+    try {
+      const addr = await connectWallet()
+      setWallet(addr)
+      toast.success('Wallet connected', { description: `${addr.slice(0, 6)}…${addr.slice(-4)}` })
+    } catch (e: any) {
+      toast.error('Wallet connection failed', { description: e?.message ?? String(e) })
+    }
+  }
 
   const selected = papers.find((p) => p.id === selectedId)!
 
@@ -142,6 +154,17 @@ function App() {
           </div>
           <div className="ml-auto flex items-center gap-4">
             <span className="hidden font-mono text-[11px] text-stone-400 sm:inline">vol. III · {papers.length} manuscripts</span>
+            <button
+              onClick={handleConnect}
+              className="rounded-sm border px-4 py-2 font-display text-sm font-semibold transition hover:brightness-110"
+              style={
+                (wallet ?? isWalletConnected())
+                  ? { borderColor: CRIMSON, color: CRIMSON }
+                  : { background: CRIMSON, borderColor: CRIMSON, color: '#fff' }
+              }
+            >
+              {wallet ? `${wallet.slice(0, 6)}…${wallet.slice(-4)}` : 'Connect Wallet'}
+            </button>
             <button
               onClick={() => setModal(true)}
               className="rounded-sm px-4 py-2 font-display text-sm font-semibold text-white transition hover:brightness-110"
