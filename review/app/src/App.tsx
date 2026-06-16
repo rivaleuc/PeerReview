@@ -1,9 +1,7 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Toaster, toast } from 'sonner'
-import { connectWallet, isWalletConnected } from './genlayer'
-
-const CONTRACT = '0x448747bD5D7c9951dAb0FD9D7DB73F45C01Bc9B6'
+import { connectWallet, isWalletConnected, read, write, CONTRACT } from './genlayer'
 
 const CRIMSON = '#9B1B30'
 
@@ -116,13 +114,13 @@ function App() {
 
   const selected = papers.find((p) => p.id === selectedId)!
 
-  function submit() {
+  async function submit() {
     if (!form.title.trim() || !form.authors.trim()) {
       toast.error('Title and authors are required')
       return
     }
     const id = 'arx-' + Math.floor(2400 + Math.random() * 99)
-    const paper: Paper = {
+    const pending: Paper = {
       id,
       title: form.title.trim(),
       authors: form.authors.trim(),
@@ -130,13 +128,44 @@ function App() {
       status: 'in-review',
       abstract: form.abstract.trim() || 'No abstract provided.',
       scores: { novelty: 0, methodology: 0, clarity: 0, reproducibility: 0 },
-      reasoning: 'Submitted to validator pool. Awaiting assignment.',
+      reasoning: 'Submitted on-chain. Validators reviewing…',
     }
-    setPapers((p) => [paper, ...p])
+    setPapers((p) => [pending, ...p])
     setSelectedId(id)
     setModal(false)
+    const abstract = form.abstract.trim() || form.title.trim()
     setForm({ title: '', authors: '', field: '', abstract: '' })
-    toast.success('Manuscript submitted', { description: `${id} entered the review queue` })
+    toast.loading('Submitting manuscript on-chain…', { id: 'rev' })
+    try {
+      // 1) submit the paper (paper_url optional)
+      await write('submit_paper', [pending.title, abstract, ''])
+      // 2) locate it
+      const stats: any = await read('stats')
+      const key = String(Number(stats.total_papers) - 1)
+      // 3) trigger the AI review
+      toast.loading('Validators scoring the paper…', { id: 'rev' })
+      await write('review_paper', [key])
+      // 4) read the real scores
+      const p: any = await read('get_paper', [key])
+      const s = p.scores || {}
+      const scores: Scores = {
+        novelty: Number(s.novelty ?? 0),
+        methodology: Number(s.methodology ?? 0),
+        clarity: Number(s.clarity ?? 0),
+        reproducibility: Number(s.reproducibility ?? 0),
+      }
+      setPapers((arr) =>
+        arr.map((x) =>
+          x.id === id ? { ...x, status: 'reviewed', scores, reasoning: String(p.reasoning || '') } : x,
+        ),
+      )
+      toast.success('Review complete — scores recorded on-chain', { id: 'rev' })
+    } catch (e: any) {
+      setPapers((arr) =>
+        arr.map((x) => (x.id === id ? { ...x, reasoning: 'Review failed: ' + (e?.message?.slice(0, 100) ?? '') } : x)),
+      )
+      toast.error('Review failed', { id: 'rev', description: e?.message?.slice(0, 120) ?? String(e) })
+    }
   }
 
   const avg = (s: Scores) => Math.round((s.novelty + s.methodology + s.clarity + s.reproducibility) / 4)
