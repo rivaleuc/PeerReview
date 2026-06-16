@@ -295,18 +295,21 @@ function App() {
 
                 <div className="mt-5 flex flex-wrap items-center gap-3">
                   <button
-                    onClick={() => toast.success('Citation copied', { description: `${selected.authors} — ${selected.id}` })}
+                    onClick={() => {
+                      const citation = `${selected.authors} — ${selected.title} (${selected.id})`
+                      if (navigator.clipboard?.writeText) {
+                        navigator.clipboard.writeText(citation).then(
+                          () => toast.success('Citation copied', { description: citation }),
+                          () => toast.error('Copy failed', { description: 'Clipboard access was denied.' }),
+                        )
+                      } else {
+                        toast.error('Clipboard unavailable in this browser')
+                      }
+                    }}
                     className="rounded-sm border px-3.5 py-2 font-display text-sm font-medium transition hover:bg-white"
                     style={{ borderColor: CRIMSON, color: CRIMSON }}
                   >
                     Cite
-                  </button>
-                  <button
-                    onClick={() => toast('Attestation recorded on-chain', { description: 'Your endorsement is now public' })}
-                    className="rounded-sm px-3.5 py-2 font-display text-sm font-medium text-white transition hover:brightness-110"
-                    style={{ background: CRIMSON }}
-                  >
-                    Endorse
                   </button>
                   <span className="ml-auto font-mono text-[10px] text-stone-300">attested via {CONTRACT.slice(0, 10)}…</span>
                 </div>
